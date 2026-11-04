@@ -91,7 +91,7 @@
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
 const keys = new Set(), allowed = new Set('wasdzxrftgyhujikol');
 const $ = id => document.getElementById(id);
-let enabled = false, ready = false, wantsControl = false, epoch = -1, sequence = 0, generation = 0, pending = false, lastPoll = 0;
+let enabled = false, ready = false, wantsControl = false, polling = true, epoch = -1, sequence = 0, generation = 0, pending = false, lastPoll = 0;
 let profiles = {1: {linear:.1, rotation:30, arm:15}, 2: {linear:.2, rotation:60, arm:35}, 3: {linear:.3, rotation:90, arm:90}};
 function drawKeys() { document.querySelectorAll('[data-key]').forEach(el => el.classList.toggle('pressed', keys.has(el.dataset.key))); }
 function settings() { return {mode: $('mode').value, profile: Number($('profile').value)}; }
@@ -120,8 +120,9 @@ function render(state) {
   showSettings();
 }
 function disconnected(message) {
+  polling = false;
   enabled = false; ready = false; wantsControl = false; keys.clear(); drawKeys();
-  $('status').textContent = message;
+  $('status').textContent = message + ' Restart the controller and open its new control URL.';
   $('status').className = 'status error';
   $('connection').textContent = 'Disconnected';
   $('enable').disabled = true;
@@ -137,7 +138,7 @@ async function request(action, extra = {}, gen = generation) {
   const response = await fetch(path, options), body = await response.json();
   if (gen !== generation) return;
   if (!response.ok) {
-    if (body.state) render(body.state);
+    if (body.state) { render(body.state); return; }
     throw new Error(body.error || 'Controller request failed.');
   }
   render(body);
@@ -170,7 +171,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && ena
 window.addEventListener('pagehide', () => { if (enabled) stop(); });
 document.addEventListener('focusin', event => { if (event.target.tagName === 'SELECT') { keys.clear(); drawKeys(); } });
 setInterval(async () => {
-  if (pending) return;
+  if (!polling || pending) return;
   if (!enabled && performance.now() - lastPoll < 500) return;
   pending = true; lastPoll = performance.now();
   const gen = generation;

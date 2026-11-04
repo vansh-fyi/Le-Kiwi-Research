@@ -148,6 +148,15 @@ class KeyboardControlTests(unittest.TestCase):
             device.prepare("arm")
         self.assertNotIn(("enable", ("arm",)), device.bus.events)
 
+    def test_optional_feedback_tolerance_clamps_startup_hold_before_enabling(self):
+        device = hardware()
+        device.positions = lambda: {"arm": 301}
+        device.prepare("arm", position_tolerance=8)
+        events = device.bus.events
+        self.assertIn(("sync_write", "Goal_Position", {"arm": 300}), events)
+        self.assertLess(events.index(("sync_write", "Goal_Position", {"arm": 300})),
+                        events.index(("enable", ("arm",))))
+
     def test_readonly_cleanup_does_not_write_or_change_torque(self):
         device = hardware()
         device.close()

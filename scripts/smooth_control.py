@@ -13,7 +13,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from keyboard_control import ARM_KEYS, BASE_KEYS, Hardware
+from keyboard_control import ARM_KEYS, BASE_KEYS, Hardware, bounded_target
 
 
 ARM_NAMES = tuple(dict.fromkeys(name for name, _ in ARM_KEYS.values()))
@@ -25,10 +25,17 @@ PROFILES = {
 }
 INPUT_TIMEOUT = 0.3
 TICKS_PER_DEGREE = 4096 / 360
+FEEDBACK_TOLERANCE = 8  # ~0.7 degrees; commanded targets remain inside calibration.
 
 
 def approach(value, target, delta):
     return value + max(-delta, min(delta, target - value))
+
+
+def safe_pose(positions, limits):
+    return {name: bounded_target(positions[name], 0, 0, low, high,
+                                 tolerance=FEEDBACK_TOLERANCE)
+            for name, (low, high) in limits.items()}
 
 
 def torque_limits(factory):
@@ -46,10 +53,11 @@ class Planner:
 
     def reset(self, positions):
         self.base = [0.0, 0.0, 0.0]
-        self.targets = dict(positions)
+        self.targets = safe_pose(positions, self.limits)
         self.arm_velocity = dict.fromkeys(ARM_NAMES, 0.0)
 
     def step(self, keys, mode, profile, positions, dt):
+        positions = safe_pose(positions, self.limits)
         dt = max(0.0, min(dt, 0.05))
         speed = PROFILES[profile]
         desired = [0.0, 0.0, 0.0]
@@ -75,8 +83,6 @@ class Planner:
         for name in ARM_NAMES:
             low, high = self.limits[name]
             current = positions[name]
-            if not low <= current <= high:
-                raise ValueError(f"{name}: current position {current} outside [{low}, {high}]")
             direction = max(-1, min(1, directions[name]))
             if direction == 0:
                 if self.arm_velocity[name] != 0:
@@ -195,7 +201,7 @@ class SmoothHardware(Hardware):
                        for name, cal in self.robot.calibration.items() if name in ARM_NAMES}
 
     def prepare(self):
-        super().prepare("arm")
+        super().prepare("arm", position_tolerance=FEEDBACK_TOLERANCE)
         self.bus.sync_write("Torque_Limit", self.full_torque, normalize=False)
         actual = self.bus.sync_read("Torque_Limit", normalize=False, num_retry=1)
         if actual != self.full_torque:
@@ -207,6 +213,7 @@ class SmoothHardware(Hardware):
         self.bus.enable_torque(self.robot.base_motors)
 
     def send(self, base, targets):
+        targets = safe_pose(targets, self.limits)
         self.move_base(*base)
         self.bus.sync_write("Goal_Position", targets, normalize=False)
 
@@ -251,7 +258,7 @@ class SimulatedHardware:
 
     def send(self, base, targets):
         self.base = base
-        self.pose = dict(targets)
+        self.pose = safe_pose(targets, self.limits)
         self.commands += 1
 
     def disarm(self):

@@ -78,7 +78,11 @@ Combined translation/rotation can be scaled by LeRobot's wheel-speed clamp.
 The arm speeds are this controller's selected limits, not manufacturer-rated
 maximum joint speeds or a guaranteed rate under load.
 
-Targets remain within each joint's saved calibration. Arm target lead over the
+Targets remain within each joint's saved calibration. Feedback within eight
+encoder ticks (approximately 0.7°) of an endpoint is tolerated and clamped when
+forming targets; larger excursions still fault. This accommodates small endpoint
+readback errors without widening the calibration or commanding beyond it.
+Arm target lead over the
 measured position is bounded to avoid accumulating a long movement queue if a
 joint cannot keep up. Frame intervals are capped during integration, preventing
 a long software pause from producing a large catch-up target.

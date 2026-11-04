@@ -83,7 +83,14 @@ async function main() {
   documents.visibilitychange();
   await sleep(80);
   assert.equal((await status()).enabled, false);
-  console.log('Frontend integration passed: combined hold, key release, Space stop, focus loss, modifier shortcut, hidden tab.');
+  let failedRequests = 0;
+  context.fetch = async () => { failedRequests++; throw new Error('Connection refused'); };
+  await sleep(510);
+  await heartbeat();
+  assert.equal(failedRequests, 1);
+  for (let i = 0; i < 3; i++) await heartbeat();
+  assert.equal(failedRequests, 1, 'Stop polling a closed server instead of spamming the SSH tunnel');
+  console.log('Frontend integration passed: combined hold, key release, stops, focus loss, server disconnection.');
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

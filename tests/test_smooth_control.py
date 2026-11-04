@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import threading
 import time
 import unittest
@@ -75,9 +76,51 @@ class PlannerTests(unittest.TestCase):
         self.planner.reset(self.positions)
         _, targets = self.planner.step({"r"}, "arm", 3, self.positions, 1 / 30)
         self.assertEqual(targets["arm_shoulder_pan"], 4000)
-        self.positions["arm_shoulder_pan"] = 4001
+        self.positions["arm_shoulder_pan"] = 4000 + smooth.FEEDBACK_TOLERANCE + 1
         with self.assertRaises(ValueError):
             self.planner.step({"r"}, "arm", 3, self.positions, 1 / 30)
+
+    def test_reported_elbow_one_tick_over_limit_is_tolerated_without_widening_targets(self):
+        self.planner.limits["arm_elbow_flex"] = (1181, 3389)
+        self.positions["arm_elbow_flex"] = 3390
+        self.planner.reset(self.positions)
+        self.assertEqual(self.planner.targets["arm_elbow_flex"], 3389)
+        _, targets = self.planner.step({"y"}, "both", 3, self.positions, 1 / 30)
+        self.assertLessEqual(targets["arm_elbow_flex"], 3389)
+        _, targets = self.planner.step(set(), "both", 3, self.positions, 1 / 30)
+        self.assertLessEqual(targets["arm_elbow_flex"], 3389)
+        self.assertEqual(self.planner.limits["arm_elbow_flex"], (1181, 3389))
+
+    def test_small_endpoint_error_allows_motion_back_into_range(self):
+        self.positions["arm_shoulder_pan"] = 4001
+        self.planner.reset(self.positions)
+        _, targets = self.planner.step({"f"}, "arm", 1, self.positions, 1 / 30)
+        self.assertLess(targets["arm_shoulder_pan"], 4000)
+
+    def test_lower_endpoint_tolerance_and_larger_error_still_rejected(self):
+        self.positions["arm_gripper"] = 99
+        self.planner.reset(self.positions)
+        self.assertEqual(self.planner.targets["arm_gripper"], 100)
+        self.positions["arm_gripper"] = 100 - smooth.FEEDBACK_TOLERANCE - 1
+        with self.assertRaises(ValueError):
+            self.planner.reset(self.positions)
+
+    def test_hardware_stop_holds_are_clamped_before_any_velocity_write(self):
+        device = smooth.SmoothHardware.__new__(smooth.SmoothHardware)
+        device.limits = dict(self.planner.limits)
+        events = []
+        device.move_base = lambda *base: events.append(("base", base))
+        device.bus = SimpleNamespace(sync_write=lambda register, targets, **kwargs:
+                                     events.append((register, targets)))
+        targets = dict(self.positions)
+        targets["arm_elbow_flex"] = 4001
+        device.send((0, 0, 0), targets)
+        self.assertEqual(events[-1][1]["arm_elbow_flex"], 4000)
+        events.clear()
+        targets["arm_elbow_flex"] = 4009
+        with self.assertRaises(ValueError):
+            device.send((0.1, 0, 0), targets)
+        self.assertEqual(events, [])
 
     def test_long_frame_cannot_create_large_target_jump(self):
         base, _ = self.planner.step({"w"}, "base", 3, self.positions, 5)

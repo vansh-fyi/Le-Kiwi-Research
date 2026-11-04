@@ -40,8 +40,8 @@ def newest_key(data):
     return data[-1]
 
 
-def bounded_target(current, direction, step, low, high):
-    if not low <= current <= high:
+def bounded_target(current, direction, step, low, high, tolerance=0):
+    if not low - tolerance <= current <= high + tolerance:
         raise ValueError(f"Present position {current} is outside calibration [{low}, {high}].")
     return max(low, min(high, current + direction * step))
 
@@ -105,7 +105,7 @@ class Hardware:
             print(f"{name}: {pos} [{cal.range_min}, {cal.range_max}] {state}")
         print("Read-only check finished; no motor settings or torque changed.")
 
-    def prepare(self, mode):
+    def prepare(self, mode, position_tolerance=0):
         self.mode = mode
         self.touched_base = True
         self.bus.disable_torque(self.robot.base_motors)
@@ -124,7 +124,8 @@ class Hardware:
         positions = self.positions()
         for name, pos in positions.items():
             cal = self.robot.calibration[name]
-            bounded_target(pos, 0, 0, cal.range_min, cal.range_max)
+            positions[name] = bounded_target(pos, 0, 0, cal.range_min, cal.range_max,
+                                             tolerance=position_tolerance)
         self.bus.sync_write("Goal_Position", positions, normalize=False)
         self.bus.enable_torque(self.robot.arm_motors)
 
