@@ -1,0 +1,14 @@
+#AI skills
+.agents/
+.claude/
+.codex/
+.cursor/
+.github/
+.opencode/
+
+# Local Python environment and generated files
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
