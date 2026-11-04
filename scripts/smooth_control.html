@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeKiwi keyboard control</title>
+<style>
+  :root { color-scheme: light; --bg: #f5f4ef; --paper: #fff; --ink: #20251e; --muted: #5b6458; --line: #20251e20; --green: #29643b; --red: #a52c25; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 1050px; margin: 0 auto; padding: 36px 24px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  h1 { margin: 0; font-size: 30px; letter-spacing: -.8px; }
+  h2 { margin: 0 0 16px; font-size: 20px; }
+  p { max-width: 65ch; color: var(--muted); }
+  .eyebrow { margin: 0 0 4px; font-size: 13px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+  .tag { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+  .toolbar, .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 20px; margin: 24px 0 16px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  select, button { font: inherit; min-height: 46px; border-radius: 6px; }
+  select { padding: 8px 34px 8px 12px; background: white; color: var(--ink); border: 1px solid #98a092; }
+  button { cursor: pointer; padding: 10px 18px; font-weight: 600; border: 1px solid transparent; }
+  button:focus-visible, select:focus-visible { outline: 3px solid #29643b80; outline-offset: 3px; }
+  button:active { transform: translateY(1px); }
+  button:disabled { cursor: default; background: #e4e7e0; color: #60695b; }
+  #enable { background: var(--green); color: white; }
+  #enable:hover:not(:disabled) { background: #1f4c2c; }
+  #enable:disabled { background: #e4e7e0; color: #60695b; }
+  #stop { background: #fceae7; color: var(--red); border-color: #a52c2540; flex: 1; min-width: 140px; }
+  #stop:hover { background: #f9d9d5; }
+  #release { color: var(--muted); background: transparent; border-color: var(--line); }
+  .status { min-height: 52px; border-left: 4px solid #9b7850; background: #eee6da; padding: 12px 16px; border-radius: 4px; }
+  .status.ready { background: #e3efe5; border-color: var(--green); }
+  .status.error { background: #fceae7; border-color: var(--red); }
+  .metrics { display: flex; flex-wrap: wrap; gap: 12px 28px; padding: 14px 0 22px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .metrics strong { color: var(--ink); }
+  .grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+  .keys { display: grid; grid-template-columns: repeat(3, 60px); gap: 10px; justify-content: center; padding: 10px 0 16px; }
+  kbd { display: inline-flex; justify-content: center; align-items: center; min-width: 40px; height: 38px; border: 1px solid #b6bdb1; border-bottom-width: 3px; border-radius: 6px; background: #f6f7f3; font: 600 15px system-ui, sans-serif; }
+  .keys kbd { height: 52px; }
+  kbd.pressed { background: var(--green); color: white; border-color: #194726; }
+  .empty { visibility: hidden; }
+  .hint { font-size: 14px; margin: 10px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-weight: 500; color: var(--muted); }
+  td, th { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  td:last-child { text-align: right; white-space: nowrap; }
+  .disabled-panel { opacity: .55; }
+  footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; }
+  footer p { margin: 0; font-size: 14px; }
+  @media(max-width: 700px) { main { padding: 24px 16px; } .grid { grid-template-columns: 1fr; } .toolbar, .panel { padding: 18px; } header { align-items: start; } h1 { font-size: 25px; } }
+</style>
+<main>
+  <header><div><p class="eyebrow">LeKiwi01</p><h1>Keyboard control</h1></div><span class="tag" id="connection">Connecting</span></header>
+  <p>Hold keys for continuous motion. You can drive and move the arm together. Keep this page focused.</p>
+  <div class="toolbar">
+    <div><label for="mode">Control mode</label><select id="mode"><option value="both">Base + arm</option><option value="base">Base only</option><option value="arm">Arm only</option></select></div>
+    <div><label for="profile">Speed · keys 1 / 2 / 3</label><select id="profile"><option value="1">1 · Slow</option><option value="2">2 · Medium</option><option value="3">3 · Fast</option></select></div>
+    <button id="enable" disabled>Enable control</button>
+    <button id="stop">Stop · Space</button>
+  </div>
+  <div id="status" class="status" role="status" aria-live="polite">Connecting to the controller…</div>
+  <div class="metrics">
+    <span>Base <strong id="linear">0.10 m/s</strong></span>
+    <span>Turn <strong id="rotation">30°/s</strong></span>
+    <span>Arm <strong id="arm-speed">15°/s</strong></span>
+    <span>Torque limit <strong id="torque">—</strong></span>
+    <span>Supply <strong id="voltage">—</strong></span>
+    <span>Motor temperature <strong id="temperature">—</strong></span>
+  </div>
+  <div class="grid">
+    <section class="panel" id="base-panel"><h2>Drive</h2>
+      <div class="keys"><kbd class="empty">·</kbd><kbd data-key="w">W</kbd><kbd class="empty">·</kbd><kbd data-key="a">A</kbd><kbd data-key="s">S</kbd><kbd data-key="d">D</kbd><kbd data-key="z">Z</kbd><kbd class="empty">·</kbd><kbd data-key="x">X</kbd></div>
+      <p class="hint">W / S forward and back · A / D sideways<br>Z / X turn · diagonal keys can be combined.</p>
+    </section>
+    <section class="panel" id="arm-panel"><h2>Move the arm</h2>
+      <table><thead><tr><th>Joint</th><th>Positive / negative</th></tr></thead><tbody>
+        <tr><td>Shoulder pan</td><td><kbd data-key="r">R</kbd> / <kbd data-key="f">F</kbd></td></tr>
+        <tr><td>Shoulder lift</td><td><kbd data-key="t">T</kbd> / <kbd data-key="g">G</kbd></td></tr>
+        <tr><td>Elbow</td><td><kbd data-key="y">Y</kbd> / <kbd data-key="h">H</kbd></td></tr>
+        <tr><td>Wrist flex</td><td><kbd data-key="u">U</kbd> / <kbd data-key="j">J</kbd></td></tr>
+        <tr><td>Wrist roll</td><td><kbd data-key="i">I</kbd> / <kbd data-key="k">K</kbd></td></tr>
+        <tr><td>Gripper</td><td><kbd data-key="o">O</kbd> / <kbd data-key="l">L</kbd></td></tr>
+      </tbody></table>
+      <p class="hint">Multiple joints can move together. Targets stay within the recorded joint ranges.</p>
+    </section>
+  </div>
+  <footer><p>Space stops base and arm. Losing focus or connection stops motion.<br>The arm holds when stopped. Support it before releasing torque.</p><button id="release">Release torque</button></footer>
+</main>
+<script>
+const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+const keys = new Set(), allowed = new Set('wasdzxrftgyhujikol');
+const $ = id => document.getElementById(id);
+let enabled = false, ready = false, wantsControl = false, epoch = -1, sequence = 0, generation = 0, pending = false, lastPoll = 0;
+let profiles = {1: {linear:.1, rotation:30, arm:15}, 2: {linear:.2, rotation:60, arm:35}, 3: {linear:.3, rotation:90, arm:90}};
+function drawKeys() { document.querySelectorAll('[data-key]').forEach(el => el.classList.toggle('pressed', keys.has(el.dataset.key))); }
+function settings() { return {mode: $('mode').value, profile: Number($('profile').value)}; }
+function showSettings() {
+  const value = profiles[$('profile').value];
+  $('linear').textContent = value.linear.toFixed(2) + ' m/s';
+  $('rotation').textContent = value.rotation + '°/s';
+  $('arm-speed').textContent = value.arm + '°/s';
+  $('base-panel').classList.toggle('disabled-panel', $('mode').value === 'arm');
+  $('arm-panel').classList.toggle('disabled-panel', $('mode').value === 'base');
+}
+function render(state) {
+  enabled = state.enabled && wantsControl; ready = state.ready && enabled; epoch = state.epoch;
+  if (!state.enabled) wantsControl = false;
+  if (!enabled) { keys.clear(); drawKeys(); }
+  $('enable').disabled = !!state.error || enabled;
+  const text = state.message;
+  if ($('status').textContent !== text) $('status').textContent = text;
+  $('status').className = 'status' + (state.error ? ' error' : ready ? ' ready' : '');
+  $('connection').textContent = state.telemetry.dry_run ? 'Simulation · no motors' : 'Connected';
+  profiles = state.profiles || profiles;
+  const t = state.telemetry;
+  $('torque').textContent = t.torque_limit_percent == null ? '—' : t.torque_limit_percent + '% when enabled';
+  $('voltage').textContent = t.min_voltage == null ? '—' : t.min_voltage.toFixed(1) + ' V';
+  $('temperature').textContent = t.max_temperature == null ? '—' : t.max_temperature + '°C max';
+  showSettings();
+}
+function disconnected(message) {
+  enabled = false; ready = false; wantsControl = false; keys.clear(); drawKeys();
+  $('status').textContent = message;
+  $('status').className = 'status error';
+  $('connection').textContent = 'Disconnected';
+  $('enable').disabled = true;
+}
+async function request(action, extra = {}, gen = generation) {
+  const options = {headers: {'X-Control-Token': token}, signal: AbortSignal.timeout(1200)};
+  let path = '/status';
+  if (action) {
+    path = '/control'; options.method = 'POST'; options.keepalive = action === 'stop';
+    options.headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify({action, ...settings(), ...extra});
+  }
+  const response = await fetch(path, options), body = await response.json();
+  if (gen !== generation) return;
+  if (!response.ok) {
+    if (body.state) render(body.state);
+    throw new Error(body.error || 'Controller request failed.');
+  }
+  render(body);
+}
+function stop(action = 'stop') {
+  generation++; enabled = false; ready = false; wantsControl = false; keys.clear(); drawKeys();
+  request(action).catch(err => disconnected(err.message));
+}
+$('enable').addEventListener('click', () => {
+  generation++; wantsControl = true; keys.clear(); drawKeys(); sequence = 0;
+  request('enable', {epoch}).catch(err => disconnected(err.message));
+});
+$('stop').addEventListener('click', () => stop());
+$('release').addEventListener('click', () => stop('release'));
+for (const id of ['mode', 'profile']) $(id).addEventListener('change', () => { keys.clear(); drawKeys(); showSettings(); });
+window.addEventListener('keydown', event => {
+  if (event.code === 'Space' || event.key === 'Escape') { event.preventDefault(); if (!event.repeat) stop(); return; }
+  if (event.ctrlKey || event.metaKey || event.altKey) { if (enabled) stop(); return; }
+  if (['SELECT', 'INPUT', 'TEXTAREA'].includes(event.target.tagName)) return;
+  const key = event.key.toLowerCase();
+  if (['1', '2', '3'].includes(key)) { $('profile').value = key; showSettings(); return; }
+  if (allowed.has(key)) {
+    event.preventDefault();
+    if (enabled && ready) { keys.add(key); drawKeys(); }
+  }
+});
+window.addEventListener('keyup', event => { keys.delete(event.key.toLowerCase()); drawKeys(); });
+window.addEventListener('blur', () => { if (enabled) stop(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && enabled) stop(); });
+window.addEventListener('pagehide', () => { if (enabled) stop(); });
+document.addEventListener('focusin', event => { if (event.target.tagName === 'SELECT') { keys.clear(); drawKeys(); } });
+setInterval(async () => {
+  if (pending) return;
+  if (!enabled && performance.now() - lastPoll < 500) return;
+  pending = true; lastPoll = performance.now();
+  const gen = generation;
+  try {
+    if (enabled) await request('input', {epoch, sequence: ++sequence, keys: [...keys]}, gen);
+    else await request(null, {}, gen);
+  } catch (err) { if (gen === generation) disconnected(err.message); }
+  finally { pending = false; }
+}, 50);
+if (!token) disconnected('Open the complete control URL printed by the server, including its token.');
+showSettings();
+</script>
+</html>

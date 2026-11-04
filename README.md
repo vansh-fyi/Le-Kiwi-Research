@@ -22,12 +22,18 @@ Current status: Ubuntu and LeRobot are installed on the physical Pi; all nine
 motors respond, calibration is saved as `lekiwi01`, and both cameras passed a
 simultaneous capture test on the user-reported battery supply. See
 [verified hardware status](docs/hardware-status.md) for results and limits.
-Gamepad control and commanded robot movement remain untested. This repository
-does not yet contain a gamepad motion controller.
+The owner has verified base and arm keyboard jogging. Smooth combined motion
+awaits a physical trial, and gamepad control is pending. This repository does
+not yet contain a gamepad motion controller.
 
 [Keyboard control](docs/keyboard-control.md) is available for an SSH terminal:
 short base movement pulses or a separate arm-jog mode. Start with the read-only
 check: `python scripts/keyboard_control.py --check` inside the Pi environment.
+
+For continuous held-key movement, use [smooth keyboard control](docs/smooth-keyboard-control.md).
+It supports base and arm together, three speed presets, live motor telemetry,
+full configured torque, and a stop on input loss. The keyboard page runs in a
+Mac browser through an SSH tunnel; the motor loop runs on the Pi.
 
 The adjacent `SoARM-Research` project is reference material for SO-101 work.
 Its Python environment, Mac device paths, and calibration files are not imported

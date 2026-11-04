@@ -55,8 +55,9 @@ the serial controller was already working.
 
 - Set camera orientation in the eventual control configuration; the room camera
   needs rotation. Do not assume LeRobot's default front/wrist device mapping.
-- Validate low-speed wheel and arm motion, stopping behaviour, and supply
-  stability under motor load. Identification pings do not test motor-load power.
+- The owner subsequently confirmed low-speed base pulses and arm jogging work.
+  Smooth combined control, stopping at higher speed and supply stability under
+  combined motor load still require physical testing.
 - Gamepad detection, mapping and control are pending delivery of the Kreo Surge XB.
 - Battery endurance and long-duration simultaneous streaming have not been tested.
 
@@ -75,7 +76,7 @@ The controller reports these wheel-only position-calibration differences rather
 than treating them as an arm calibration failure: wheel commands use velocity
 mode, without position normalization. It does not rewrite those offsets.
 
-Actual keyboard-driven movement remains unverified. The official LeKiwi example
+The owner subsequently verified keyboard-driven base and arm jogging. The official LeKiwi example
 uses a desktop keyboard listener on the laptop for base control, plus a leader
 arm. Our terminal input replaces that desktop listener for headless SSH usage;
 arm joint jogging is custom functionality. See the
